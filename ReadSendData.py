@@ -1,44 +1,34 @@
-import time
+import asyncio
+
+from enum import Enum
+from typing import List
 from dataclasses import dataclass
-from typing import List, Any
 
 
 @dataclass
-class Event:
-    recipients: List[str]
+class Result(Enum):
+    Accepted = "Accepted"
+    Rejected = "Rejected"
 
 
-@dataclass
-class Result:
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
+async def read_data() -> Event:
+    recipients = List[Address()]
+    payload = Payload()
+    return Event(recipients=recipients, payload=payload)
 
 
-class Handler:
-    def readData(self) -> Any:
-        pass
+async def send_data(dest: Address, payload: Payload) -> Result:
+    return Result.Accepted
 
-    def sendData(self, dest: str, payload: Any) -> str:
-        pass
 
-    def performOperation(self):
-        events = []
+async def perform_operation() -> None:
+    while True:
+        event = await read_data()
+        for recipient in event.recipients:
+            result = await send_data(recipient, event.payload)
+            if result == Result.Rejected:
+                await asyncio.sleep(timeout_seconds)
 
-        while True:
-            data = self.readData()
-            if not data:
-                break
 
-            for event in events:
-                for recipient in event.recipients:
-                    result = self.sendData(recipient, data)
-                    if result == Result.REJECTED:
-                        time.sleep(self.timeout())
-                    else:
-                        event.recipients.remove(recipient)
-
-                if not event.recipients:
-                    events.remove(event)
-
-    def timeout(self) -> int:
-        return 5  # Пример задержки 5 секунд
+loop = asyncio.get_event_loop()
+loop.run_until_complete(perform_operation())
