@@ -1,61 +1,53 @@
+import asyncio
+from enum import Enum
 from dataclasses import dataclass
-import time
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+
+
+class Response(Enum):
+    Success = "Success"
+    RetryAfter = "RetryAfter"
+    Failure = "Failure"
 
 
 @dataclass
-class Success:
-    application_status: str
+class ApplicationResponse:
     application_id: str
+    status: Response
+    description: str
+    last_request_time: datetime
+    retriesCount: int or None
 
 
-@dataclass
-class RetryAfter:
-    delay: int
+async def get_application_status1(identifier: str) -> Response:
+    return Response.Success
 
 
-@dataclass
-class Failure:
-    ex: Exception
+async def get_application_status2(identifier: str) -> Response:
+    return Response.Failure
 
 
-@dataclass
-class ApplicationStatusResponse:
-    id: str
-    status: str
+async def perform_operation() -> ApplicationResponse:
+    application_id = "12345"
+
+    async def fetch_status(service, identifier):
+        if service == 1:
+            return await get_application_status1(identifier)
+        elif service == 2:
+            return await get_application_status2(identifier)
+
+    with ThreadPoolExecutor() as executor:
+        loop = asyncio.get_event_loop()
+        tasks = [loop.run_in_executor(executor, fetch_status, service, application_id) for service in range(1, 3)]
+        responses = await asyncio.gather(*tasks)
+        status = Response.Success if all(response == Response.Success for response in responses) else Response.Failure
+        description = "All services processed successfully" if status == Response.Success else "At least one service failed"
+        last_request_time = datetime.now()
+        retries_count = None
+        return ApplicationResponse(application_id, status, description, last_request_time, retries_count)
 
 
-@dataclass
-class Handler:
-    def performOperation(self, id: str) -> ApplicationStatusResponse:
-        start_time = time.time()
-        response1 = self.getApplicationStatus1(id)
-        if isinstance(response1, Success):
-            return ApplicationStatusResponse(id=response1.application_id, status=response1.application_status)
-        elif isinstance(response1, RetryAfter):
-            if time.time() - start_time >= 15:
-                return ApplicationStatusResponse.Failure(lastRequestTime=None, retriesCount=1)
-
-        response2 = self.getApplicationStatus2(id)
-        if isinstance(response2, Success):
-            return ApplicationStatusResponse(id=response2.application_id, status=response2.application_status)
-        elif isinstance(response2, RetryAfter):
-            if time.time() - start_time >= 15:
-                return ApplicationStatusResponse.Failure(lastRequestTime=None, retriesCount=2)
-
-        return ApplicationStatusResponse.Failure(lastRequestTime=None, retriesCount=2)
-
-
-@dataclass
-class Client:
-    def getApplicationStatus1(self, id: str):
-        pass
-
-    def getApplicationStatus2(self, id: str):
-        pass
-
-
-client = Client()
-handler = Handler()
-
-response = handler.performOperation("12345")
-print(response)
+loop = asyncio.get_event_loop()
+result = loop.run_until_complete(perform_operation())
+print(result)
